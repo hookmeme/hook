@@ -1,1 +1,899 @@
-test
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOOK - Uniswap V4 Hook Token</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0c0d12;--card:#ffffff08;--border:#ffffff0d;--cyan:#7bdcff;--green:#3fb950;--red:#f85149;--purple:#a855f7;--text:#fff;--text2:#ffffff80;--text3:#ffffff4d}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.container{max-width:1440px;margin:0 auto;padding:20px}
+button{cursor:pointer;border:none;font-family:inherit}
+input{font-family:inherit}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:24px}
+.header-left{display:flex;align-items:center;gap:16px}
+.logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#7bdcff,#2563eb);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#000}
+.token-name{font-size:24px;font-weight:700}
+.token-badge{font-size:11px;padding:3px 8px;border-radius:6px;background:#7bdcff22;color:var(--cyan);border:1px solid #7bdcff44;font-weight:700}
+.price-display{font-size:20px;font-weight:700;font-family:'Courier New',monospace;margin-top:4px}
+.price-change{font-size:13px;padding:2px 8px;border-radius:6px;font-weight:600;margin-left:12px}
+.price-up{background:#3fb95015;color:var(--green)}
+.price-down{background:#f8514915;color:var(--red)}
+
+/* Connect Button */
+.connect-btn{padding:10px 20px;border-radius:12px;background:linear-gradient(135deg,#7bdcff,#2563eb);color:#000;font-weight:700;font-size:14px;transition:all .2s}
+.connect-btn:hover{opacity:.9;transform:translateY(-1px)}
+.connect-btn.connected{background:#ffffff0f;color:var(--cyan);border:1px solid #7bdcff44}
+.wallet-info{display:flex;align-items:center;gap:8px}
+.wallet-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* Grid Layout */
+.main-grid{display:grid;grid-template-columns:7fr 5fr;gap:24px}
+.left-col{display:block}
+.right-col{display:block}
+@media(max-width:1024px){.main-grid{grid-template-columns:1fr}.left-col,.right-col{display:none}}
+
+/* Cards */
+.card{border-radius:20px;border:1px solid var(--border);background:var(--card);padding:20px;backdrop-filter:blur(10px)}
+.card-title{font-size:14px;color:var(--text2);font-weight:500;margin-bottom:16px}
+
+/* Chart */
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.chart-indicators{display:flex;gap:4px;flex-wrap:wrap}
+.chart-indicators button{padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;background:#ffffff0a;color:var(--text3);border:1px solid transparent;transition:all .2s}
+.chart-indicators button.active{background:var(--cyan);color:#000;border-color:var(--cyan)}
+.chart-indicators button:hover:not(.active){color:var(--text);background:#ffffff15}
+#chart-container{width:100%;height:400px;border-radius:12px;overflow:hidden}
+
+/* Trade Box */
+.trade-tabs{display:flex;gap:4px;padding:4px;background:#ffffff0a;border-radius:12px;margin-bottom:16px}
+.trade-tab{flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text3);background:transparent;transition:all .2s}
+.trade-tab.active-buy{background:var(--green);color:#000}
+.trade-tab.active-sell{background:var(--red);color:#fff}
+.trade-tab.active-borrow{background:var(--cyan);color:#000}
+.trade-tab.active-repay{background:var(--purple);color:#fff}
+
+.input-group{margin-bottom:12px}
+.input-label{display:flex;justify-content:space-between;font-size:12px;color:var(--text3);margin-bottom:6px}
+.input-field{width:100%;padding:14px 16px;border-radius:12px;background:#ffffff0a;border:1px solid var(--border);color:var(--text);font-size:18px;font-family:'Courier New',monospace;outline:none;transition:border-color .2s}
+.input-field:focus{border-color:#7bdcff66}
+.input-field::placeholder{color:#ffffff30}
+.pct-btns{display:flex;gap:6px;margin-top:8px}
+.pct-btn{flex:1;padding:8px;border-radius:10px;font-size:11px;font-weight:600;background:#ffffff0a;border:1px solid var(--border);color:var(--text3);transition:all .2s}
+.pct-btn:hover{color:var(--text);border-color:#ffffff30}
+.pct-btn.max{background:#7bdcff15;border-color:#7bdcff33;color:var(--cyan)}
+
+.estimate-box{background:#ffffff0a;border-radius:12px;padding:12px;border:1px solid var(--border);margin:12px 0}
+.estimate-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0}
+.estimate-label{color:var(--text3)}
+.estimate-value{font-family:'Courier New',monospace;font-weight:600}
+
+.action-btn{width:100%;padding:14px;border-radius:16px;font-size:14px;font-weight:700;transition:all .2s;margin-top:12px}
+.action-btn:disabled{opacity:.5;cursor:not-allowed}
+.action-btn.buy{background:var(--green);color:#000}
+.action-btn.sell{background:var(--red);color:#fff}
+.action-btn.borrow{background:var(--cyan);color:#000}
+.action-btn.repay{background:var(--purple);color:#fff}
+
+/* Slippage */
+.slippage-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.slippage-label{font-size:12px;color:var(--text3)}
+.slippage-btns{display:flex;gap:4px}
+.slippage-btn{padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;background:#ffffff0a;border:1px solid var(--border);color:var(--text3);transition:all .2s}
+.slippage-btn.active{background:var(--cyan);color:#000;border-color:var(--cyan)}
+
+/* Info Section */
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #ffffff06}
+.info-label{font-size:12px;color:var(--text3)}
+.info-value{font-size:13px;font-family:'Courier New',monospace;font-weight:500}
+.info-value.highlight{color:var(--cyan)}
+
+/* Borrow Info Box */
+.borrow-info{background:#7bdcff08;border-radius:12px;padding:12px;border:1px solid #7bdcff33;margin-bottom:12px}
+.borrow-info .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);display:inline-block;margin-right:6px}
+.borrow-info-title{font-size:12px;font-weight:600;color:#7bdcffcc;margin-bottom:8px}
+
+/* Toast */
+.toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 20px;border-radius:12px;font-size:13px;font-weight:500;animation:slideIn .3s;backdrop-filter:blur(10px)}
+.toast.success{background:#3fb95020;border:1px solid #3fb95044;color:var(--green)}
+.toast.error{background:#f8514920;border:1px solid #f8514944;color:var(--red)}
+.toast.loading{background:#7bdcff20;border:1px solid #7bdcff44;color:var(--cyan)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* Links */
+.contract-link{font-size:12px;font-family:'Courier New',monospace;color:var(--text2);text-decoration:none;transition:color .2s}
+.contract-link:hover{color:var(--cyan)}
+
+/* Mobile tabs */
+.mobile-tabs{display:none;gap:4px;padding:4px;background:#ffffff0a;border-radius:12px;margin-bottom:16px}
+@media(max-width:1024px){
+  .mobile-tabs{display:flex}
+  .main-grid{display:block}
+  .left-col,.right-col{display:none}
+  .mobile-active{display:block!important}
+  .desktop-only{display:none!important}
+}
+.mobile-tab{flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:600;color:var(--text3);background:transparent;text-align:center;transition:all .2s}
+.mobile-tab.active{background:#ffffff15;color:var(--text)}
+
+/* Floor highlight */
+.floor-box{background:linear-gradient(135deg,#7bdcff15,#7bdcff05);border-radius:12px;padding:12px;border:1px solid #7bdcff33;margin-bottom:12px}
+.floor-box .floor-label{font-size:12px;color:#7bdcffaa}
+.floor-box .floor-value{font-size:20px;font-weight:700;color:var(--cyan);font-family:'Courier New',monospace}
+
+/* Social links */
+.social-links{display:flex;gap:12px;margin-top:12px}
+.social-link{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);text-decoration:none;transition:color .2s}
+.social-link:hover{color:var(--cyan)}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="toast-container" id="toasts"></div>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">H</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="token-name">HOOK</span>
+          <span class="token-badge">V4 Hook</span>
+        </div>
+        <div style="display:flex;align-items:center;margin-top:4px">
+          <span class="price-display" id="current-price">-- ETH</span>
+          <span class="price-change price-up" id="price-change">--%</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <button class="connect-btn" id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+    </div>
+  </div>
+
+  <!-- Mobile Tabs -->
+  <div class="mobile-tabs">
+    <button class="mobile-tab active" onclick="switchMobileTab('chart',this)">Chart</button>
+    <button class="mobile-tab" onclick="switchMobileTab('trade',this)">Trade</button>
+    <button class="mobile-tab" onclick="switchMobileTab('info',this)">Info</button>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+    <div class="left-col mobile-active" id="col-chart">
+      <!-- Chart Card -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="chart-header">
+          <span class="card-title" style="margin:0">Price Curve</span>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:2px;background:#7bdcff;border-radius:2px;display:inline-block"></span><span style="font-size:11px;color:var(--text3)">Price</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:2px;background:#f97316;border-radius:2px;display:inline-block;border-bottom:1px dashed #f97316"></span><span style="font-size:11px;color:var(--text3)">Floor</span></div>
+          </div>
+        </div>
+        <div id="chart-container"></div>
+        <div style="text-align:center;font-size:10px;color:var(--text3);margin-top:8px">Scroll to zoom | Drag to pan</div>
+      </div>
+
+      <!-- Stats (desktop: below chart; mobile: separate tab) -->
+      <div class="card desktop-only" id="stats-card-desktop">
+        <div class="card-title">On-Chain Stats</div>
+        <div id="stats-content-desktop"></div>
+      </div>
+    </div>
+
+    <div class="right-col" id="col-trade">
+      <!-- Trade Box -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="trade-tabs">
+          <button class="trade-tab active-buy" id="tab-buy" onclick="switchTab('buy')">Buy</button>
+          <button class="trade-tab" id="tab-sell" onclick="switchTab('sell')">Sell</button>
+          <button class="trade-tab" id="tab-borrow" onclick="switchTab('borrow')">Borrow</button>
+          <button class="trade-tab" id="tab-repay" onclick="switchTab('repay')">Repay</button>
+        </div>
+        <div id="trade-content"></div>
+      </div>
+
+      <!-- Token Info (desktop: below trade; mobile: info tab) -->
+      <div class="card desktop-only" id="info-card-desktop">
+        <div class="card-title">Token Info</div>
+        <div id="token-info-content-desktop"></div>
+      </div>
+    </div>
+
+    <!-- Mobile-only: Info tab content -->
+    <div class="left-col" id="col-info">
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-title">On-Chain Stats</div>
+        <div id="stats-content-mobile"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Token Info</div>
+        <div id="token-info-content-mobile"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+// ==================== CONFIG ====================
+const CHAIN_ID = 1;
+const RPC_URL = 'https://ethereum-rpc.publicnode.com';
+const BLOCK_EXPLORER = 'https://etherscan.io';
+const HOOK_TOKEN_ADDRESS = '0x5a489927487Af2281E079D32638A04B34D8d7e68';
+const HOOK_ADDRESS = '0x77A1917321fEe39397Ce88d4242F99F77419E888';
+const HOOK_SWAP_ROUTER_ADDRESS = '0x823E62F9F24e2Cf0C43D449aE740878A9A6389Df';
+const HOOK_TREASURY_ADDRESS = '0xF539431684360939D0b6e9A1968fc6FE4c7F17eD';
+
+const POOL_KEY_TUPLE = [
+  '0x0000000000000000000000000000000000000000',
+  HOOK_TOKEN_ADDRESS, 3000, 60, HOOK_ADDRESS
+];
+
+const HOOK_TOKEN_ABI = [
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+  'function totalSupply() view returns (uint256)',
+  'function balanceOf(address) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'event Transfer(address indexed from, address indexed to, uint256 value)'
+];
+
+const HOOK_ABI = [
+  'function floorPrice() view returns (uint256)',
+  'function realETH() view returns (uint256)',
+  'function virtualETH() view returns (uint256)',
+  'function totalBorrowedETH() view returns (uint256)',
+  'function collateralSupply() view returns (uint256)',
+  'function effectiveETH() view returns (uint256)',
+  'function getEffectivePrice() view returns (uint256)',
+  'function circulatingSupply() view returns (uint256)',
+  'function estimateBuy(uint256 ethIn) view returns (uint256 tokensOut, uint256 swapFee)',
+  'function estimateSell(uint256 tokenAmount) view returns (uint256 ethOut, uint256 swapFee)',
+  'function estimateBorrowMore(address user) view returns (uint256 additionalEth, uint256 fee)',
+  'function borrowedETH(address) view returns (uint256)',
+  'function collateralBalance(address) view returns (uint256)',
+  'function borrow(uint256 amount) external',
+  'function borrowMore() external',
+  'function repay() external payable',
+  'event Buy(address indexed buyer, uint256 ethIn, uint256 tokensOut, uint256 newPrice, uint256 swapFee, uint256 reserved)',
+  'event Sell(address indexed seller, uint256 tokensIn, uint256 ethOut, uint256 newPrice, uint256 swapFee, uint256 reserved)'
+];
+
+const HOOK_SWAP_ROUTER_ABI = [
+  'function buy(tuple(address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minTokensOut) external payable',
+  'function sell(tuple(address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 tokenAmount, uint256 minEthOut) external'
+];
+
+// ==================== STATE ====================
+let provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+let signer = null;
+let account = null;
+let currentTab = 'buy';
+let slippage = 5;
+let userEthBalance = '0';
+let userTokenBalance = '0';
+let userBorrowedETH = '0';
+let userCollateral = '0';
+let tokenData = {};
+let chart = null;
+let lineSeries = null;
+let areaSeries = null;
+let floorLineSeries = null;
+let priceHistory = [];
+
+// ==================== TOAST ====================
+function showToast(msg, type='loading') {
+  const container = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  if (type !== 'loading') setTimeout(() => el.remove(), 4000);
+  return el;
+}
+
+// ==================== WALLET ====================
+async function connectWallet() {
+  if (!window.ethereum) { showToast('Please install MetaMask', 'error'); return; }
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    account = accounts[0];
+    const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+    signer = web3Provider.getSigner();
+    const network = await web3Provider.getNetwork();
+    if (network.chainId !== CHAIN_ID) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x' + CHAIN_ID.toString(16) }]
+        });
+      } catch(e) { showToast('Please switch to Ethereum Mainnet', 'error'); }
+    }
+    updateConnectBtn();
+    await fetchBalances();
+    renderTradeContent();
+  } catch(e) { showToast(e.message || 'Connection failed', 'error'); }
+}
+
+function updateConnectBtn() {
+  const btn = document.getElementById('connect-btn');
+  if (account) {
+    btn.className = 'connect-btn connected';
+    btn.innerHTML = `<span class="wallet-info"><span class="wallet-dot"></span>${account.slice(0,6)}...${account.slice(-4)}</span>`;
+  }
+}
+
+// ==================== DATA FETCHING ====================
+async function fetchOnChainData() {
+  try {
+    const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, provider);
+    const tokenContract = new ethers.Contract(HOOK_TOKEN_ADDRESS, HOOK_TOKEN_ABI, provider);
+    const [floor, realEth, virtualEth, totalBorrowed, collateral, effectivePrice, circSupply, totalSupply] = await Promise.all([
+      hookContract.floorPrice(),
+      hookContract.realETH(),
+      hookContract.virtualETH(),
+      hookContract.totalBorrowedETH(),
+      hookContract.collateralSupply(),
+      hookContract.getEffectivePrice(),
+      hookContract.circulatingSupply(),
+      tokenContract.totalSupply()
+    ]);
+    tokenData = {
+      floorPrice: floor.toString(),
+      realETH: realEth.toString(),
+      virtualETH: virtualEth.toString(),
+      totalBorrowed: totalBorrowed.toString(),
+      collateralSupply: collateral.toString(),
+      effectivePrice: effectivePrice.toString(),
+      circulatingSupply: circSupply.toString(),
+      totalSupply: totalSupply.toString()
+    };
+    updatePriceDisplay();
+    renderStats();
+    renderTokenInfo();
+    addPricePoint(tokenData.effectivePrice);
+  } catch(e) { console.error('Data fetch error:', e); }
+}
+
+async function fetchBalances() {
+  if (!account) return;
+  try {
+    const tokenContract = new ethers.Contract(HOOK_TOKEN_ADDRESS, HOOK_TOKEN_ABI, provider);
+    const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, provider);
+    const [tBal, eBal, borrowed, collateral] = await Promise.all([
+      tokenContract.balanceOf(account),
+      provider.getBalance(account),
+      hookContract.borrowedETH(account),
+      hookContract.collateralBalance(account)
+    ]);
+    userTokenBalance = tBal.toString();
+    userEthBalance = eBal.toString();
+    userBorrowedETH = borrowed.toString();
+    userCollateral = collateral.toString();
+    renderTradeContent();
+  } catch(e) { console.error('Balance error:', e); }
+}
+
+// ==================== PRICE HISTORY FROM EVENTS ====================
+async function fetchPriceHistory() {
+  try {
+    const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, provider);
+    const currentBlock = await provider.getBlockNumber();
+    const fromBlock = currentBlock - 5000; // ~last 16 hours on ETH
+    const [buyEvents, sellEvents] = await Promise.all([
+      hookContract.queryFilter(hookContract.filters.Buy(), fromBlock, currentBlock),
+      hookContract.queryFilter(hookContract.filters.Sell(), fromBlock, currentBlock)
+    ]);
+    const allEvents = [...buyEvents, ...sellEvents].sort((a,b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
+    if (allEvents.length === 0) {
+      // Generate synthetic data from current price
+      generateSyntheticHistory();
+      return;
+    }
+    const blockCache = {};
+    const batchSize = 20;
+    for (let i = 0; i < allEvents.length; i += batchSize) {
+      const batch = allEvents.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (ev) => {
+        if (!blockCache[ev.blockNumber]) {
+          blockCache[ev.blockNumber] = await provider.getBlock(ev.blockNumber);
+        }
+      }));
+    }
+    priceHistory = allEvents.map(ev => ({
+      time: blockCache[ev.blockNumber].timestamp,
+      value: parseFloat(ethers.utils.formatEther(ev.args.newPrice)),
+      volume: parseFloat(ethers.utils.formatEther(ev.args.ethIn || ev.args.ethOut || '0'))
+    })).filter(p => p.value > 0);
+    if (priceHistory.length > 0) renderChart();
+  } catch(e) {
+    console.error('Event fetch error:', e);
+    generateSyntheticHistory();
+  }
+}
+
+function generateSyntheticHistory() {
+  const price = tokenData.effectivePrice ? parseFloat(ethers.utils.formatEther(tokenData.effectivePrice)) : 0.0001;
+  if (price <= 0) return;
+  const now = Math.floor(Date.now() / 1000);
+  priceHistory = [];
+  for (let i = 100; i >= 0; i--) {
+    const t = now - i * 60;
+    const variance = (Math.random() - 0.5) * 0.1 * price;
+    priceHistory.push({ time: t, value: Math.max(price + variance, price * 0.5), volume: Math.random() * 0.5 });
+  }
+  renderChart();
+}
+
+function addPricePoint(priceWei) {
+  const price = parseFloat(ethers.utils.formatEther(priceWei));
+  if (price <= 0) return;
+  const now = Math.floor(Date.now() / 1000);
+  if (priceHistory.length > 0 && priceHistory[priceHistory.length-1].time >= now) return;
+  priceHistory.push({ time: now, value: price, volume: 0 });
+  renderChart();
+}
+
+// ==================== CHART ====================
+function renderChart() {
+  if (priceHistory.length === 0) return;
+  const container = document.getElementById('chart-container');
+  if (!chart) {
+    chart = LightweightCharts.createChart(container, {
+      width: container.clientWidth,
+      height: 400,
+      layout: { background: { type: 'solid', color: '#0c0d12' }, textColor: '#ffffff80', fontSize: 11 },
+      grid: { vertLines: { visible: false }, horzLines: { color: '#ffffff08', style: 3 } },
+      crosshair: { mode: 0, vertLine: { color: '#ffffff33', style: 2 }, horzLine: { color: '#ffffff33', style: 2 } },
+      rightPriceScale: { borderColor: '#ffffff08', scaleMargins: { top: 0.08, bottom: 0.08 } },
+      timeScale: { borderColor: '#ffffff08', timeVisible: true, secondsVisible: false },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true }
+    });
+    areaSeries = chart.addAreaSeries({
+      topColor: 'rgba(123,220,255,0.18)', bottomColor: 'rgba(123,220,255,0.0)',
+      lineColor: 'transparent', lineWidth: 0,
+      lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false
+    });
+    lineSeries = chart.addLineSeries({
+      color: '#7bdcff', lineWidth: 2, lineType: 2,
+      crosshairMarkerVisible: true, crosshairMarkerRadius: 4,
+      crosshairMarkerBorderColor: '#7bdcff', crosshairMarkerBackgroundColor: '#0c0d12',
+      lastValueVisible: true, priceLineVisible: true, priceLineColor: '#7bdcff44', priceLineStyle: 2,
+      priceFormat: { type: 'custom', formatter: smartFormat }
+    });
+    floorLineSeries = chart.addLineSeries({
+      color: '#f97316', lineWidth: 2, lineStyle: 2,
+      crosshairMarkerVisible: false, lastValueVisible: true,
+      priceLineVisible: false, title: 'Floor',
+      priceFormat: { type: 'custom', formatter: smartFormat }
+    });
+    window.addEventListener('resize', () => { if(chart) chart.applyOptions({ width: container.clientWidth }); });
+  }
+
+  const deduped = deduplicateData(priceHistory);
+  lineSeries.setData(deduped);
+  areaSeries.setData(deduped);
+
+  // Floor price as horizontal line across entire chart
+  if (tokenData.floorPrice && tokenData.floorPrice !== '0') {
+    const floorVal = parseFloat(ethers.utils.formatEther(tokenData.floorPrice));
+    if (floorVal > 0 && deduped.length > 0) {
+      const floorData = deduped.map(d => ({ time: d.time, value: floorVal }));
+      floorLineSeries.setData(floorData);
+    }
+  }
+
+  chart.timeScale().fitContent();
+}
+
+function deduplicateData(data) {
+  const map = new Map();
+  data.forEach(d => map.set(d.time, d));
+  return Array.from(map.values()).sort((a,b) => a.time - b.time);
+}
+
+// ==================== FORMATTING ====================
+function smartFormat(price) {
+  if (price === 0) return '0';
+  if (price >= 1) return price.toFixed(4);
+  const s = price.toFixed(18);
+  const dot = s.indexOf('.');
+  let firstNZ = -1;
+  for (let i = dot + 1; i < s.length; i++) { if (s[i] !== '0') { firstNZ = i; break; } }
+  if (firstNZ === -1) return '0';
+  return price.toFixed(Math.min(firstNZ - dot + 2, 14));
+}
+
+function fmtEth(wei) {
+  if (!wei || wei === '0') return '0';
+  try {
+    const v = parseFloat(ethers.utils.formatEther(wei));
+    return smartFormat(v);
+  } catch { return '0'; }
+}
+
+function fmtToken(wei) {
+  if (!wei || wei === '0') return '0';
+  try {
+    const v = parseFloat(ethers.utils.formatEther(wei));
+    if (v >= 1000000) return (v/1000000).toFixed(2) + 'M';
+    if (v >= 1000) return (v/1000).toFixed(2) + 'K';
+    return v.toFixed(2);
+  } catch { return '0'; }
+}
+
+function shortenAddr(addr) { return addr ? addr.slice(0,6)+'...'+addr.slice(-4) : ''; }
+
+// ==================== UI UPDATES ====================
+function updatePriceDisplay() {
+  document.getElementById('current-price').textContent = fmtEth(tokenData.effectivePrice) + ' ETH';
+}
+
+function renderStats() {
+  const html = `
+    <div class="floor-box">
+      <div class="floor-label">Floor Price (Never Goes Below)</div>
+      <div class="floor-value">${fmtEth(tokenData.floorPrice)} ETH</div>
+    </div>
+    <div class="info-row"><span class="info-label">Effective Price</span><span class="info-value highlight">${fmtEth(tokenData.effectivePrice)} ETH</span></div>
+    <div class="info-row"><span class="info-label">Real ETH Reserve</span><span class="info-value">${fmtEth(tokenData.realETH)} ETH</span></div>
+    <div class="info-row"><span class="info-label">Virtual ETH</span><span class="info-value">${fmtEth(tokenData.virtualETH)} ETH</span></div>
+    <div class="info-row"><span class="info-label">Total Borrowed</span><span class="info-value">${fmtEth(tokenData.totalBorrowed)} ETH</span></div>
+    <div class="info-row"><span class="info-label">Collateral Supply</span><span class="info-value">${fmtToken(tokenData.collateralSupply)} HOOK</span></div>
+    <div class="info-row"><span class="info-label">Circulating Supply</span><span class="info-value">${fmtToken(tokenData.circulatingSupply)} HOOK</span></div>
+    <div class="info-row"><span class="info-label">Total Supply</span><span class="info-value">${fmtToken(tokenData.totalSupply)} HOOK</span></div>
+    <div class="info-row"><span class="info-label">Max Supply</span><span class="info-value">21,000,000 HOOK</span></div>
+  `;
+  const d = document.getElementById('stats-content-desktop');
+  const m = document.getElementById('stats-content-mobile');
+  if (d) d.innerHTML = html;
+  if (m) m.innerHTML = html;
+}
+
+function renderTokenInfo() {
+  const html = `
+    <div class="info-row"><span class="info-label">Hook Contract</span><a class="contract-link" href="${BLOCK_EXPLORER}/address/${HOOK_ADDRESS}" target="_blank">${shortenAddr(HOOK_ADDRESS)}</a></div>
+    <div class="info-row"><span class="info-label">Token</span><a class="contract-link" href="${BLOCK_EXPLORER}/address/${HOOK_TOKEN_ADDRESS}" target="_blank">${shortenAddr(HOOK_TOKEN_ADDRESS)}</a></div>
+    <div class="info-row"><span class="info-label">Router</span><a class="contract-link" href="${BLOCK_EXPLORER}/address/${HOOK_SWAP_ROUTER_ADDRESS}" target="_blank">${shortenAddr(HOOK_SWAP_ROUTER_ADDRESS)}</a></div>
+    <div class="info-row"><span class="info-label">Treasury</span><a class="contract-link" href="${BLOCK_EXPLORER}/address/${HOOK_TREASURY_ADDRESS}" target="_blank">${shortenAddr(HOOK_TREASURY_ADDRESS)}</a></div>
+    <div class="info-row"><span class="info-label">Network</span><span class="info-value highlight">Ethereum Mainnet</span></div>
+    <div class="social-links">
+      <a class="social-link" href="https://x.com/hookethmeme" target="_blank">X: @hookethmeme</a>
+      <a class="social-link" href="https://t.me/hook731" target="_blank">TG: @hook731</a>
+    </div>
+  `;
+  const d = document.getElementById('token-info-content-desktop');
+  const m = document.getElementById('token-info-content-mobile');
+  if (d) d.innerHTML = html;
+  if (m) m.innerHTML = html;
+}
+
+// ==================== TRADE UI ====================
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.trade-tab').forEach(el => el.className = 'trade-tab');
+  document.getElementById('tab-'+tab).className = 'trade-tab active-'+tab;
+  renderTradeContent();
+}
+
+function renderTradeContent() {
+  const el = document.getElementById('trade-content');
+  if (currentTab === 'buy' || currentTab === 'sell') {
+    const isBuy = currentTab === 'buy';
+    const bal = isBuy ? fmtEth(userEthBalance) + ' ETH' : fmtToken(userTokenBalance) + ' HOOK';
+    el.innerHTML = `
+      <div class="slippage-row">
+        <span class="slippage-label">Slippage</span>
+        <div class="slippage-btns">
+          ${[1,3,5,10].map(s => `<button class="slippage-btn ${slippage===s?'active':''}" onclick="setSlippage(${s})">${s}%</button>`).join('')}
+        </div>
+      </div>
+      <div class="input-group">
+        <div class="input-label"><span>${isBuy?'You Pay (ETH)':'Amount (HOOK)'}</span><span>Balance: ${bal}</span></div>
+        <input class="input-field" type="number" id="trade-amount" placeholder="0.0" step="any" oninput="onAmountChange()">
+        <div class="pct-btns">
+          ${[25,50,75].map(p => `<button class="pct-btn" onclick="setPct(${p})">${p}%</button>`).join('')}
+          <button class="pct-btn max" onclick="setPct(100)">MAX</button>
+        </div>
+      </div>
+      <div class="estimate-box" id="estimate-box" style="display:none"></div>
+      <button class="action-btn ${currentTab}" id="action-btn" onclick="executeTrade()" ${!account?'disabled':''}>${!account?'Connect Wallet':isBuy?'Buy HOOK':'Sell HOOK'}</button>
+    `;
+  } else if (currentTab === 'borrow') {
+    el.innerHTML = `
+      <div class="borrow-info">
+        <div class="borrow-info-title"><span class="dot"></span>Borrow Info</div>
+        <div class="estimate-row"><span class="estimate-label">Collateral Ratio</span><span class="estimate-value" style="color:var(--cyan)">97% LTV</span></div>
+        <div class="estimate-row"><span class="estimate-label">Borrow Fee</span><span class="estimate-value" style="color:var(--cyan)">3%</span></div>
+        <div class="estimate-row"><span class="estimate-label">Your Debt</span><span class="estimate-value" style="color:var(--cyan)">${fmtEth(userBorrowedETH)} ETH</span></div>
+        <div class="estimate-row"><span class="estimate-label">Locked Collateral</span><span class="estimate-value" style="color:var(--cyan)">${fmtToken(userCollateral)} HOOK</span></div>
+      </div>
+      <div class="input-group">
+        <div class="input-label"><span>Collateral (HOOK)</span><span>Balance: ${fmtToken(userTokenBalance)} HOOK</span></div>
+        <input class="input-field" type="number" id="trade-amount" placeholder="0.0" step="any" oninput="onBorrowAmountChange()">
+        <div class="pct-btns">
+          ${[25,50,75].map(p => `<button class="pct-btn" onclick="setPctToken(${p})">${p}%</button>`).join('')}
+          <button class="pct-btn max" onclick="setPctToken(100)">MAX</button>
+        </div>
+      </div>
+      <div class="estimate-box" id="estimate-box" style="display:none"></div>
+      <button class="action-btn borrow" id="action-btn" onclick="executeBorrow()" ${!account?'disabled':''}>
+        ${!account?'Connect Wallet':'Borrow ETH'}
+      </button>
+      ${userBorrowedETH !== '0' && BigInt(userBorrowedETH) > 0n ? `<button class="action-btn borrow" style="margin-top:8px;background:#7bdcff33;color:var(--cyan)" onclick="executeBorrowMore()">Borrow More</button>` : ''}
+    `;
+  } else if (currentTab === 'repay') {
+    const hasDebt = userBorrowedETH !== '0' && BigInt(userBorrowedETH) > 0n;
+    el.innerHTML = `
+      <div class="borrow-info" style="border-color:#a855f744;background:#a855f708">
+        <div class="borrow-info-title" style="color:#c084fc"><span class="dot" style="background:var(--purple)"></span>Repay Info</div>
+        <div class="estimate-row"><span class="estimate-label">Outstanding Debt</span><span class="estimate-value" style="color:var(--purple)">${fmtEth(userBorrowedETH)} ETH</span></div>
+        <div class="estimate-row"><span class="estimate-label">Locked Tokens</span><span class="estimate-value" style="color:var(--purple)">${fmtToken(userCollateral)} HOOK</span></div>
+      </div>
+      ${hasDebt ? `
+        <div class="input-group">
+          <div class="input-label"><span>Repay Amount (ETH)</span><span>Balance: ${fmtEth(userEthBalance)} ETH</span></div>
+          <input class="input-field" type="number" id="trade-amount" placeholder="0.0" step="any">
+          <div class="pct-btns">
+            ${[25,50,75].map(p => `<button class="pct-btn" onclick="setPctDebt(${p})">${p}%</button>`).join('')}
+            <button class="pct-btn max" onclick="setPctDebt(100)">MAX</button>
+          </div>
+        </div>
+        <button class="action-btn repay" onclick="executeRepay()" ${!account?'disabled':''}>${!account?'Connect Wallet':'Repay Debt'}</button>
+      ` : `<div style="text-align:center;padding:32px;color:var(--green)">No outstanding debt</div>`}
+    `;
+  }
+}
+
+function setSlippage(s) { slippage = s; renderTradeContent(); }
+
+function setPct(pct) {
+  const raw = currentTab === 'buy' ? userEthBalance : userTokenBalance;
+  let bn = ethers.BigNumber.from(raw || '0');
+  if (pct === 100 && currentTab === 'buy') {
+    bn = bn.sub(ethers.utils.parseEther('0.002'));
+    if (bn.lt(0)) bn = ethers.BigNumber.from(0);
+  } else {
+    bn = bn.mul(pct).div(100);
+  }
+  const input = document.getElementById('trade-amount');
+  if (input && bn.gt(0)) { input.value = ethers.utils.formatEther(bn); onAmountChange(); }
+}
+
+function setPctToken(pct) {
+  let bn = ethers.BigNumber.from(userTokenBalance || '0').mul(pct).div(100);
+  const input = document.getElementById('trade-amount');
+  if (input && bn.gt(0)) input.value = ethers.utils.formatEther(bn);
+}
+
+function setPctDebt(pct) {
+  let bn = ethers.BigNumber.from(userBorrowedETH || '0').mul(pct).div(100);
+  const input = document.getElementById('trade-amount');
+  if (input && bn.gt(0)) input.value = ethers.utils.formatEther(bn);
+}
+
+// ==================== ESTIMATES ====================
+let estimateTimer = null;
+function onAmountChange() {
+  clearTimeout(estimateTimer);
+  estimateTimer = setTimeout(async () => {
+    const input = document.getElementById('trade-amount');
+    const box = document.getElementById('estimate-box');
+    if (!input || !box) return;
+    const val = input.value;
+    if (!val || parseFloat(val) <= 0) { box.style.display = 'none'; return; }
+    try {
+      const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, provider);
+      if (currentTab === 'buy') {
+        const wei = ethers.utils.parseEther(val);
+        const result = await hookContract.estimateBuy(wei);
+        box.style.display = 'block';
+        box.innerHTML = `
+          <div class="estimate-row"><span class="estimate-label">Est. Receive</span><span class="estimate-value" style="color:var(--green)">~${fmtToken(result.tokensOut.toString())} HOOK</span></div>
+          <div class="estimate-row"><span class="estimate-label">Swap Fee</span><span class="estimate-value">${fmtEth(result.swapFee.toString())} ETH</span></div>
+        `;
+      } else if (currentTab === 'sell') {
+        const wei = ethers.utils.parseEther(val);
+        const result = await hookContract.estimateSell(wei);
+        box.style.display = 'block';
+        box.innerHTML = `
+          <div class="estimate-row"><span class="estimate-label">Est. Receive</span><span class="estimate-value" style="color:var(--red)">~${fmtEth(result.ethOut.toString())} ETH</span></div>
+          <div class="estimate-row"><span class="estimate-label">Swap Fee</span><span class="estimate-value">${fmtEth(result.swapFee.toString())} ETH</span></div>
+        `;
+      }
+    } catch(e) { box.style.display = 'none'; }
+  }, 400);
+}
+
+function onBorrowAmountChange() {
+  const input = document.getElementById('trade-amount');
+  const box = document.getElementById('estimate-box');
+  if (!input || !box) return;
+  const val = input.value;
+  if (!val || parseFloat(val) <= 0 || !tokenData.floorPrice || tokenData.floorPrice === '0') { box.style.display = 'none'; return; }
+  try {
+    const tokenWei = ethers.utils.parseEther(val);
+    const fp = ethers.BigNumber.from(tokenData.floorPrice);
+    const value = tokenWei.mul(fp).div(ethers.utils.parseEther('1'));
+    const collateralValue = value.mul(9700).div(10000);
+    const fee = collateralValue.mul(300).div(10000);
+    const receive = collateralValue.sub(fee);
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div class="estimate-row"><span class="estimate-label">Est. Receive</span><span class="estimate-value" style="color:var(--cyan)">~${fmtEth(receive.toString())} ETH</span></div>
+      <div class="estimate-row"><span class="estimate-label">Borrow Fee (3%)</span><span class="estimate-value">${fmtEth(fee.toString())} ETH</span></div>
+    `;
+  } catch { box.style.display = 'none'; }
+}
+
+// ==================== TRADE EXECUTION ====================
+async function executeTrade() {
+  if (!account || !signer) { showToast('Please connect wallet', 'error'); return; }
+  const input = document.getElementById('trade-amount');
+  if (!input || !input.value || parseFloat(input.value) <= 0) return;
+  const btn = document.getElementById('action-btn');
+  btn.disabled = true;
+  btn.textContent = '...';
+  let toast;
+  try {
+    const router = new ethers.Contract(HOOK_SWAP_ROUTER_ADDRESS, HOOK_SWAP_ROUTER_ABI, signer);
+    if (currentTab === 'buy') {
+      const value = ethers.utils.parseEther(input.value);
+      let minOut = ethers.BigNumber.from(0);
+      try {
+        const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, provider);
+        const est = await hookContract.estimateBuy(value);
+        minOut = est.tokensOut.mul(100 - slippage).div(100);
+      } catch {}
+      toast = showToast('Buying HOOK...', 'loading');
+      const tx = await router.buy(POOL_KEY_TUPLE, minOut, { value });
+      await tx.wait();
+      toast.remove();
+      showToast('Buy successful!', 'success');
+    } else {
+      const amount = ethers.utils.parseEther(input.value);
+      const tokenContract = new ethers.Contract(HOOK_TOKEN_ADDRESS, HOOK_TOKEN_ABI, signer);
+      const allowance = await tokenContract.allowance(account, HOOK_SWAP_ROUTER_ADDRESS);
+      if (allowance.lt(amount)) {
+        toast = showToast('Approving...', 'loading');
+        const appTx = await tokenContract.approve(HOOK_SWAP_ROUTER_ADDRESS, ethers.constants.MaxUint256);
+        await appTx.wait();
+        toast.remove();
+      }
+      let minOut = ethers.BigNumber.from(0);
+      try {
+        const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, provider);
+        const est = await hookContract.estimateSell(amount);
+        minOut = est.ethOut.mul(100 - slippage).div(100);
+      } catch {}
+      toast = showToast('Selling HOOK...', 'loading');
+      const tx = await router.sell(POOL_KEY_TUPLE, amount, minOut);
+      await tx.wait();
+      toast.remove();
+      showToast('Sell successful!', 'success');
+    }
+    input.value = '';
+    await refresh();
+  } catch(e) {
+    if (toast) toast.remove();
+    showToast(e.reason || e.message || 'Transaction failed', 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = currentTab === 'buy' ? 'Buy HOOK' : 'Sell HOOK';
+}
+
+async function executeBorrow() {
+  if (!account || !signer) { showToast('Please connect wallet', 'error'); return; }
+  const input = document.getElementById('trade-amount');
+  if (!input || !input.value || parseFloat(input.value) <= 0) return;
+  const btn = document.getElementById('action-btn');
+  btn.disabled = true;
+  let toast;
+  try {
+    const amount = ethers.utils.parseEther(input.value);
+    const tokenContract = new ethers.Contract(HOOK_TOKEN_ADDRESS, HOOK_TOKEN_ABI, signer);
+    const allowance = await tokenContract.allowance(account, HOOK_ADDRESS);
+    if (allowance.lt(amount)) {
+      toast = showToast('Approving...', 'loading');
+      const appTx = await tokenContract.approve(HOOK_ADDRESS, ethers.constants.MaxUint256);
+      await appTx.wait();
+      toast.remove();
+    }
+    toast = showToast('Borrowing ETH...', 'loading');
+    const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, signer);
+    const tx = await hookContract.borrow(amount);
+    await tx.wait();
+    toast.remove();
+    showToast('Borrow successful!', 'success');
+    input.value = '';
+    await refresh();
+  } catch(e) {
+    if (toast) toast.remove();
+    showToast(e.reason || e.message || 'Borrow failed', 'error');
+  }
+  btn.disabled = false;
+}
+
+async function executeBorrowMore() {
+  if (!account || !signer) return;
+  let toast = showToast('Borrowing more...', 'loading');
+  try {
+    const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, signer);
+    const tx = await hookContract.borrowMore();
+    await tx.wait();
+    toast.remove();
+    showToast('Borrow more successful!', 'success');
+    await refresh();
+  } catch(e) { toast.remove(); showToast(e.reason || e.message || 'Failed', 'error'); }
+}
+
+async function executeRepay() {
+  if (!account || !signer) return;
+  const input = document.getElementById('trade-amount');
+  if (!input || !input.value || parseFloat(input.value) <= 0) return;
+  let toast = showToast('Repaying...', 'loading');
+  try {
+    const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, signer);
+    const value = ethers.utils.parseEther(input.value);
+    const tx = await hookContract.repay({ value });
+    await tx.wait();
+    toast.remove();
+    showToast('Repay successful!', 'success');
+    input.value = '';
+    await refresh();
+  } catch(e) { toast.remove(); showToast(e.reason || e.message || 'Repay failed', 'error'); }
+}
+
+// ==================== REFRESH ====================
+async function refresh() {
+  await Promise.all([fetchOnChainData(), fetchBalances()]);
+}
+
+// ==================== MOBILE ====================
+function switchMobileTab(tab, btn) {
+  document.querySelectorAll('.mobile-tab').forEach(el => el.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('col-chart').classList.toggle('mobile-active', tab === 'chart');
+  document.getElementById('col-trade').classList.toggle('mobile-active', tab === 'trade');
+  document.getElementById('col-info').classList.toggle('mobile-active', tab === 'info');
+}
+
+// ==================== INIT ====================
+async function init() {
+  renderTradeContent();
+  await fetchOnChainData();
+  await fetchPriceHistory();
+  // Auto-refresh every 15s
+  setInterval(fetchOnChainData, 15000);
+  setInterval(() => { if(account) fetchBalances(); }, 15000);
+  // Listen for account changes
+  if (window.ethereum) {
+    window.ethereum.on('accountsChanged', (accounts) => {
+      account = accounts[0] || null;
+      if (account) {
+        const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = web3Provider.getSigner();
+      } else { signer = null; }
+      updateConnectBtn();
+      fetchBalances();
+      renderTradeContent();
+    });
+    window.ethereum.on('chainChanged', () => window.location.reload());
+  }
+}
+
+init();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
