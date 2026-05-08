@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/hookmeme/hook/refs/heads/main/images/hook.png">
+<link rel="apple-touch-icon" href="https://raw.githubusercontent.com/hookmeme/hook/refs/heads/main/images/hook.png">
 <title>HOOK - Uniswap V4 Hook Token</title>
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 <style>
@@ -19,8 +21,6 @@ input{font-family:inherit}
 .token-name{font-size:24px;font-weight:700}
 .token-badge{font-size:11px;padding:3px 8px;border-radius:6px;background:#7bdcff22;color:var(--cyan);border:1px solid #7bdcff44;font-weight:700}
 .price-display{font-size:20px;font-weight:700;font-family:'Courier New',monospace;margin-top:4px}
-.price-change{font-size:13px;padding:2px 8px;border-radius:6px;font-weight:600;margin-left:12px}
-.price-up{background:#3fb95015;color:var(--green)}
 
 .connect-btn{padding:10px 20px;border-radius:12px;background:linear-gradient(135deg,#7bdcff,#2563eb);color:#000;font-weight:700;font-size:14px;transition:all .2s}
 .connect-btn:hover{opacity:.9;transform:translateY(-1px)}
@@ -30,7 +30,40 @@ input{font-family:inherit}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 
 .main-grid{display:grid;grid-template-columns:7fr 5fr;gap:24px}
-@media(max-width:1024px){.main-grid{grid-template-columns:1fr}.left-col,.right-col{display:none!important}}
+#col-info{display:none!important}
+@media(max-width:768px){
+  .header{flex-direction:column;align-items:flex-start;gap:12px}
+  .header-right{width:100%;justify-content:flex-end}
+  .header-left{gap:10px}
+  .logo{width:36px;height:36px}
+  .token-name{font-size:18px}
+  .price-display{font-size:16px}
+  .container{padding:12px}
+  #bonding-curve-canvas{height:280px}
+  .card{padding:16px;border-radius:16px}
+  .card+.card,.card+div,.left-col .card:not(:first-child){margin-top:16px}
+  .trade-tabs{flex-wrap:nowrap}
+  .trade-tab{padding:8px 4px;font-size:12px}
+  .input-field{padding:12px 14px;font-size:16px}
+  .action-btn{padding:12px;font-size:13px}
+  .pct-btns{gap:4px}
+  .pct-btn{padding:6px;font-size:10px}
+  .curve-legend{gap:8px}
+  .curve-legend span{font-size:10px}
+  .chart-header{flex-direction:column;align-items:flex-start;gap:6px}
+  .slippage-btns{gap:3px}
+  .slippage-btn{padding:4px 8px;font-size:10px}
+  .mobile-tabs{margin-bottom:12px}
+  .mobile-tab{padding:8px;font-size:11px}
+}
+@media(max-width:1024px){
+  .main-grid{grid-template-columns:1fr;display:block}
+  .left-col,.right-col{display:none!important}
+  #col-info{display:none!important}
+  #col-info.mobile-active{display:block!important}
+  .left-col.mobile-active,.right-col.mobile-active{display:block!important}
+  .desktop-only-card{display:none!important}
+}
 
 .card{border-radius:20px;border:1px solid var(--border);background:var(--card);padding:20px;backdrop-filter:blur(10px)}
 .card-title{font-size:14px;color:var(--text2);font-weight:500;margin-bottom:16px}
@@ -95,8 +128,6 @@ input{font-family:inherit}
 .mobile-tabs{display:none;gap:4px;padding:4px;background:#ffffff0a;border-radius:12px;margin-bottom:16px}
 @media(max-width:1024px){
   .mobile-tabs{display:flex}
-  .main-grid{display:block}
-  .left-col,.right-col{display:none!important}
   .mobile-active{display:block!important}
 }
 .mobile-tab{flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:600;color:var(--text3);background:transparent;text-align:center;transition:all .2s}
@@ -133,7 +164,6 @@ input{font-family:inherit}
         </div>
         <div style="display:flex;align-items:center;margin-top:4px">
           <span class="price-display" id="current-price">-- ETH</span>
-          <span class="price-change price-up" id="price-change">--%</span>
         </div>
       </div>
     </div>
@@ -165,7 +195,7 @@ input{font-family:inherit}
         <div id="curve-stats" style="display:flex;justify-content:center;gap:24px;margin-top:10px;flex-wrap:wrap"></div>
       </div>
 
-      <div class="card">
+      <div class="card desktop-only-card">
         <div class="card-title">On-Chain Data</div>
         <div id="stats-content"></div>
       </div>
@@ -182,7 +212,7 @@ input{font-family:inherit}
         <div id="trade-content"></div>
       </div>
 
-      <div class="card">
+      <div class="card desktop-only-card">
         <div class="card-title">Token Info</div>
         <div id="token-info-content"></div>
       </div>
