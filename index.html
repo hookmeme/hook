@@ -293,6 +293,8 @@ let userEthBalance = '0';
 let userTokenBalance = '0';
 let userBorrowedETH = '0';
 let userCollateral = '0';
+let borrowMoreAdditional = '0';
+let borrowMoreFee = '0';
 let tokenData = {};
 let currentLang = 'en';
 
@@ -621,16 +623,19 @@ async function fetchBalances() {
   try {
     const tokenContract = new ethers.Contract(HOOK_TOKEN_ADDRESS, HOOK_TOKEN_ABI, provider);
     const hookContract = new ethers.Contract(HOOK_ADDRESS, HOOK_ABI, provider);
-    const [tBal, eBal, borrowed, collateral] = await Promise.all([
+    const [tBal, eBal, borrowed, collateral, borrowMoreEst] = await Promise.all([
       tokenContract.balanceOf(account),
       provider.getBalance(account),
       hookContract.borrowedETH(account),
-      hookContract.collateralBalance(account)
+      hookContract.collateralBalance(account),
+      hookContract.estimateBorrowMore(account)
     ]);
     userTokenBalance = tBal.toString();
     userEthBalance = eBal.toString();
     userBorrowedETH = borrowed.toString();
     userCollateral = collateral.toString();
+    borrowMoreAdditional = borrowMoreEst.additionalEth.toString();
+    borrowMoreFee = borrowMoreEst.fee.toString();
     renderTradeContent();
   } catch(e) { console.error('Balance error:', e); }
 }
@@ -1005,7 +1010,13 @@ function renderTradeContent() {
       <button class="action-btn borrow" id="action-btn" onclick="executeBorrow()" ${!account?'disabled':''}>
         ${!account?t('connectWallet'):t('borrowEth')}
       </button>
-      ${userBorrowedETH !== '0' && BigInt(userBorrowedETH) > 0n ? `<button class="action-btn borrow" style="margin-top:8px;background:#7bdcff33;color:var(--cyan)" onclick="executeBorrowMore()">${t('borrowMore')}</button>` : ''}
+      ${userBorrowedETH !== '0' && BigInt(userBorrowedETH) > 0n ? `
+        <div class="estimate-box" style="display:block;margin-top:12px">
+          <div class="estimate-row"><span class="estimate-label">${t('borrowMore')}</span><span class="estimate-value" style="color:var(--cyan)">${fmtEth(borrowMoreAdditional)} ETH</span></div>
+          <div class="estimate-row"><span class="estimate-label">${t('borrowFee3')}</span><span class="estimate-value">${fmtEth(borrowMoreFee)} ETH</span></div>
+        </div>
+        <button class="action-btn borrow" style="margin-top:8px;background:#7bdcff33;color:var(--cyan)" onclick="executeBorrowMore()">${t('borrowMore')}${BigInt(borrowMoreAdditional) > 0n ? ' (+' + fmtEth(borrowMoreAdditional) + ' ETH)' : ''}</button>
+      ` : ''}
     `;
   } else if (currentTab === 'repay') {
     const hasDebt = userBorrowedETH !== '0' && BigInt(userBorrowedETH) > 0n;
